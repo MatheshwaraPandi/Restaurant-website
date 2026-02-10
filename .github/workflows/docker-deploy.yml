@@ -1,3 +1,4 @@
+
 name: Docker CI/CD to EC2
 
 on:
@@ -13,13 +14,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Verify files
+        run: ls -la
+
       - name: Build Docker image
-        run: |
-          docker build -t restaurant-site:latest .
+        run: docker build -t restaurant-site:latest .
 
       - name: Save Docker image
-        run: |
-          docker save restaurant-site:latest | gzip > restaurant-site.tar.gz
+        run: docker save restaurant-site:latest | gzip > restaurant-site.tar.gz
 
       - name: Copy image to EC2
         uses: appleboy/scp-action@v0.1.7
@@ -27,8 +29,8 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "restaurant-site.tar.gz"
-          target: "/home/ubuntu"
+          source: restaurant-site.tar.gz
+          target: /home/ubuntu
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
@@ -41,6 +43,7 @@ jobs:
             docker stop restaurant-site || true
             docker rm restaurant-site || true
             docker run -d \
+              --restart unless-stopped \
               --name restaurant-site \
               -p 80:80 \
               restaurant-site:latest
