@@ -1,5 +1,4 @@
-
-name: Docker CI/CD to EC2
+name: Docker CI/CD (Self-Hosted)
 
 on:
   push:
@@ -8,42 +7,24 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Verify files
-        run: ls -la
+      - uses: actions/checkout@v4
 
       - name: Build Docker image
         run: docker build -t restaurant-site:latest .
 
-      - name: Save Docker image
-        run: docker save restaurant-site:latest | gzip > restaurant-site.tar.gz
+      - name: Stop old container
+        run: |
+          docker stop restaurant-site || true
+          docker rm restaurant-site || true
 
-      - name: Copy image to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: restaurant-site.tar.gz
-          target: /home/ubuntu
+      - name: Run new container
+        run: |
+          docker run -d \
+            --restart unless-stopped \
+            --name restaurant-site \
+            -p 80:80 \
+            restaurant-site:latest
 
-      - name: Deploy on EC2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            docker load < restaurant-site.tar.gz
-            docker stop restaurant-site || true
-            docker rm restaurant-site || true
-            docker run -d \
-              --restart unless-stopped \
-              --name restaurant-site \
-              -p 80:80 \
-              restaurant-site:latest
